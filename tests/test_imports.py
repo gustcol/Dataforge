@@ -33,9 +33,11 @@ class TestCoreImports:
             SparkConfig,
             RapidsConfig,
             PandasConfig,
+            PolarsConfig,
         )
         assert DataForgeConfig is not None
         assert EngineConfig is not None
+        assert PolarsConfig is not None
 
     def test_import_exceptions(self):
         """Test exception imports."""
@@ -52,6 +54,7 @@ class TestCoreImports:
         """Test base class imports."""
         from dataforge.core.base import EngineType, DataFrameEngine
         assert EngineType.PANDAS.value == "pandas"
+        assert EngineType.POLARS.value == "polars"
         assert EngineType.SPARK.value == "spark"
         assert EngineType.RAPIDS.value == "rapids"
 
@@ -63,6 +66,11 @@ class TestEngineImports:
         """Test Pandas engine import."""
         from dataforge.engines.pandas_engine import PandasEngine
         assert PandasEngine is not None
+
+    def test_import_polars_engine(self):
+        """Test Polars engine import."""
+        from dataforge.engines.polars_engine import PolarsEngine
+        assert PolarsEngine is not None
 
     def test_import_spark_engine(self):
         """Test Spark engine import."""

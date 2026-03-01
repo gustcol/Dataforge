@@ -44,11 +44,13 @@ class EngineType(str, Enum):
 
     Attributes:
         PANDAS: In-memory processing with pandas
+        POLARS: High-performance processing with Polars (Rust-backed)
         SPARK: Distributed processing with PySpark
         RAPIDS: GPU-accelerated processing with cuDF
         AUTO: Automatic engine selection based on data characteristics
     """
     PANDAS = "pandas"
+    POLARS = "polars"
     SPARK = "spark"
     RAPIDS = "rapids"
     AUTO = "auto"
@@ -114,6 +116,56 @@ class PandasConfig:
             raise ValueError("max_memory_mb must be at least 256")
         if self.categorical_threshold < 2:
             raise ValueError("categorical_threshold must be at least 2")
+
+
+@dataclass
+class PolarsConfig:
+    """
+    Configuration for the Polars engine.
+
+    Polars is a high-performance DataFrame library written in Rust that
+    provides lazy evaluation, parallel execution, and memory-efficient
+    processing for medium-to-large datasets on a single node.
+
+    Attributes:
+        use_lazy: Enable lazy evaluation mode for query optimization
+            Polars will build an execution plan and optimize it before running.
+            Performance gain: Significant for complex query chains.
+
+        streaming: Enable streaming mode for out-of-core processing
+            Allows processing datasets larger than available memory.
+
+        n_rows: Default number of rows for head/sample operations
+
+        rechunk: Rechunk DataFrames after operations for contiguous memory
+            Improves performance for subsequent operations at memory cost.
+
+        parallel: Enable parallel execution of operations
+            Uses all available CPU cores automatically.
+
+        max_threads: Maximum number of threads for parallel operations
+            Default: None (uses all available cores).
+
+    Example:
+        >>> config = PolarsConfig(
+        ...     use_lazy=True,
+        ...     streaming=True,
+        ...     max_threads=8
+        ... )
+    """
+    use_lazy: bool = True
+    streaming: bool = False
+    n_rows: int = 5
+    rechunk: bool = True
+    parallel: bool = True
+    max_threads: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        """Validate configuration values."""
+        if self.n_rows < 1:
+            raise ValueError("n_rows must be at least 1")
+        if self.max_threads is not None and self.max_threads < 1:
+            raise ValueError("max_threads must be at least 1")
 
 
 @dataclass
@@ -393,6 +445,7 @@ class DataForgeConfig:
         >>> df = DataFrame.read_csv("data.csv", config=config)
     """
     pandas: PandasConfig = field(default_factory=PandasConfig)
+    polars: PolarsConfig = field(default_factory=PolarsConfig)
     spark: SparkConfig = field(default_factory=SparkConfig)
     rapids: RapidsConfig = field(default_factory=RapidsConfig)
     engine_selection: EngineConfig = field(default_factory=EngineConfig)
@@ -468,6 +521,7 @@ class DataForgeConfig:
         # Simple merge - other takes precedence for non-None values
         return DataForgeConfig(
             pandas=other.pandas if other.pandas else self.pandas,
+            polars=other.polars if other.polars else self.polars,
             spark=other.spark if other.spark else self.spark,
             rapids=other.rapids if other.rapids else self.rapids,
             engine_selection=other.engine_selection or self.engine_selection,

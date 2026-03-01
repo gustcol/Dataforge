@@ -54,6 +54,9 @@ class EngineType(str, Enum):
         PANDAS: Single-node, in-memory processing using pandas
             Best for: < 1GB datasets, complex transformations, EDA
 
+        POLARS: High-performance single-node processing using Polars
+            Best for: 100MB - 10GB datasets, lazy evaluation, Rust-backed speed
+
         SPARK: Distributed processing using PySpark
             Best for: > 1GB datasets, production pipelines, cluster computing
 
@@ -73,6 +76,7 @@ class EngineType(str, Enum):
         >>> df = DataFrame.read_csv("data.csv", engine=EngineType.AUTO)
     """
     PANDAS = "pandas"
+    POLARS = "polars"
     SPARK = "spark"
     RAPIDS = "rapids"
     AUTO = "auto"

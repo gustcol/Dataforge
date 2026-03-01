@@ -23,6 +23,7 @@ class TestEngineType:
         from dataforge.core.base import EngineType
 
         assert EngineType.PANDAS.value == "pandas"
+        assert EngineType.POLARS.value == "polars"
         assert EngineType.SPARK.value == "spark"
         assert EngineType.RAPIDS.value == "rapids"
         assert EngineType.AUTO.value == "auto"
@@ -64,6 +65,17 @@ class TestConfig:
         assert config.gpu_memory_fraction == 0.8
         assert config.fallback_to_pandas is True
         assert config.enable_spilling is True
+
+    def test_polars_config_defaults(self):
+        """Test PolarsConfig default values."""
+        from dataforge.core.config import PolarsConfig
+
+        config = PolarsConfig()
+        assert config.use_lazy is True
+        assert config.streaming is False
+        assert config.rechunk is True
+        assert config.parallel is True
+        assert config.max_threads is None
 
     def test_dataforge_config(self):
         """Test DataForgeConfig."""
@@ -123,9 +135,19 @@ class TestEngineRecommender:
         from dataforge.core.base import EngineType
 
         recommender = EngineRecommender()
-        rec = recommender.recommend(data_size_mb=10000, has_gpu=False)  # 10 GB
+        rec = recommender.recommend(data_size_mb=20000, has_gpu=False)  # 20 GB
 
         assert rec.engine == EngineType.SPARK
+
+    def test_recommend_polars_for_medium_data(self):
+        """Test Polars recommendation for medium data without GPU."""
+        from dataforge.advisor.engine_recommender import EngineRecommender
+        from dataforge.core.base import EngineType
+
+        recommender = EngineRecommender()
+        rec = recommender.recommend(data_size_mb=500, has_gpu=False)  # 500 MB
+
+        assert rec.engine == EngineType.POLARS
 
     def test_recommendation_has_reason(self):
         """Test that recommendation includes reason."""

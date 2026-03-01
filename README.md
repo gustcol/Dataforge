@@ -3,10 +3,10 @@
 **Intelligent Data Processing Framework for Pandas, Spark, and RAPIDS**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-DataForge is a production-ready Python framework that intelligently selects and utilizes the optimal data processing engine (Pandas, PySpark, or RAPIDS/cuDF) based on dataset characteristics, available hardware, and use case requirements.
+DataForge is a production-ready Python framework that intelligently selects and utilizes the optimal data processing engine (Pandas, Polars, PySpark, or RAPIDS/cuDF) based on dataset characteristics, available hardware, and use case requirements.
 
 ## Table of Contents
 
@@ -31,8 +31,9 @@ DataForge is a production-ready Python framework that intelligently selects and 
 
 ## Features
 
-- **Unified API**: Single interface for Pandas, Spark, and RAPIDS DataFrames
+- **Unified API**: Single interface for Pandas, Polars, Spark, and RAPIDS DataFrames
 - **Automatic Engine Selection**: Intelligent recommendation based on data size and hardware
+- **Polars Integration**: High-performance Rust-backed engine for medium datasets
 - **Full Databricks Integration**: Delta Lake, Unity Catalog, Photon optimization
 - **S3 Storage Optimization**: File compaction, format conversion, cost analysis
 - **Data Quality**: Schema validation, profiling, and quality checks
@@ -51,6 +52,9 @@ pip install dataforge
 ### With Optional Dependencies
 
 ```bash
+# With Polars support (recommended for single-node workloads)
+pip install dataforge[polars]
+
 # With Spark support
 pip install dataforge[spark]
 
@@ -98,9 +102,10 @@ DataForge automatically recommends the optimal engine based on your data and har
 | Dataset Size | Hardware | Recommended Engine | Performance Gain |
 |-------------|----------|-------------------|------------------|
 | < 100 MB | Any | **Pandas** | Baseline |
-| 100 MB - 1 GB | No GPU | **Pandas/Spark** | Depends on operation |
+| 100 MB - 1 GB | No GPU | **Polars** | 5-20x vs Pandas |
 | 100 MB - 1 GB | GPU | **RAPIDS** | 5-20x vs Pandas |
-| 1 GB - 10 GB | No GPU | **Spark** | Required for scale |
+| 1 GB - 10 GB | No GPU, No Cluster | **Polars** | Best single-node performance |
+| 1 GB - 10 GB | With Cluster | **Spark** | Distributed processing |
 | 1 GB - 10 GB | GPU | **RAPIDS** | 20-100x vs Pandas |
 | > 10 GB | Any | **Spark** | Distributed required |
 
@@ -156,11 +161,32 @@ pandas_df = result.to_pandas()
 spark_df = result.to_spark(spark_session)
 ```
 
+### Polars Engine
+
+Polars is a high-performance DataFrame library written in Rust that provides lazy evaluation and parallel execution:
+
+```python
+from dataforge.engines import PolarsEngine
+from dataforge.core.config import PolarsConfig
+
+# Configure Polars engine
+config = PolarsConfig(use_lazy=True, streaming=True)
+engine = PolarsEngine(config)
+
+# Read and process data
+df = engine.read_parquet("data.parquet")
+result = engine.filter(df, "age > 30")
+result = engine.groupby(result, ["city"], {"salary": ["mean", "sum"]})
+
+# Convert to pandas when needed
+pandas_df = engine.to_pandas(result)
+```
+
 ### Engine Escape Hatches
 
 ```python
 # Access native engine for engine-specific operations
-native_df = df.native  # Returns underlying Pandas/Spark/cuDF DataFrame
+native_df = df.native  # Returns underlying Pandas/Polars/Spark/cuDF DataFrame
 
 # Convert between engines
 pandas_df = df.to_pandas()
@@ -802,6 +828,39 @@ for chunk in pd.read_csv('large.csv', chunksize=100000):
 pd.options.mode.copy_on_write = True
 ```
 
+### Polars Optimizations
+
+```python
+# 1. Use lazy evaluation for query optimization
+import polars as pl
+lf = pl.scan_parquet("data.parquet")
+result = (
+    lf.filter(pl.col("age") > 30)
+    .group_by("city")
+    .agg(pl.col("salary").mean())
+    .collect()  # Execute optimized plan
+)
+
+# 2. Use streaming for large datasets
+result = (
+    pl.scan_parquet("large_data.parquet")
+    .filter(pl.col("status") == "active")
+    .collect(streaming=True)  # Process in chunks
+)
+
+# 3. Use expressions instead of apply()
+df.with_columns(
+    pl.col("name").str.to_uppercase().alias("name_upper"),
+    (pl.col("price") * pl.col("quantity")).alias("total"),
+)
+
+# 4. Leverage multi-threaded execution (automatic)
+# Polars uses all CPU cores by default
+
+# 5. Use sink_parquet for memory-efficient writes
+lf.sink_parquet("output.parquet")
+```
+
 ### Spark Optimizations
 
 ```python
@@ -921,14 +980,60 @@ See the `examples/` directory for complete examples:
 
 ## Code Validation
 
-This project uses [ty](https://github.com/astral-sh/ty) for Python type checking:
+### Type Checking with ty
+
+This project uses [ty](https://github.com/astral-sh/ty) — an extremely fast Python type checker from Astral (makers of Ruff), written in Rust:
 
 ```bash
 # Install ty
 pip install ty
+# or with uv
+uv tool install ty
 
 # Run type checking
 ty check dataforge/
+
+# Check specific module
+ty check dataforge/engines/polars_engine.py
+```
+
+### Linting with Ruff
+
+```bash
+# Install ruff
+pip install ruff
+
+# Lint
+ruff check dataforge/
+
+# Auto-fix
+ruff check dataforge/ --fix
+```
+
+### Pre-commit Hooks
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+
+# Run against all files
+pre-commit run --all-files
+```
+
+### Testing
+
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run with coverage
+python -m pytest tests/ --cov=dataforge --cov-report=html
+
+# Run specific test
+python -m pytest tests/test_core.py -v
 ```
 
 ## Contributing
@@ -943,11 +1048,12 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## License
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
 - Apache Spark team for PySpark
+- Polars team for the high-performance DataFrame library
 - NVIDIA RAPIDS team for cuDF
 - Databricks team for Delta Lake and Unity Catalog
 - pandas development team

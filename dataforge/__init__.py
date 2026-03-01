@@ -29,7 +29,7 @@ Example:
     >>> result.write_parquet("output.parquet")
 
 Author: DataForge Team
-License: Apache 2.0
+License: MIT
 """
 
 __version__ = "1.0.0"
@@ -42,6 +42,7 @@ from dataforge.core.config import (
     SparkConfig,
     RapidsConfig,
     PandasConfig,
+    PolarsConfig,
 )
 from dataforge.core.exceptions import (
     DataForgeError,
@@ -63,6 +64,11 @@ def get_pandas_engine():
     """Get the Pandas engine implementation."""
     from dataforge.engines.pandas_engine import PandasEngine
     return PandasEngine
+
+def get_polars_engine():
+    """Get the Polars engine implementation."""
+    from dataforge.engines.polars_engine import PolarsEngine
+    return PolarsEngine
 
 def get_spark_engine():
     """Get the Spark engine implementation."""
@@ -116,6 +122,7 @@ __all__ = [
     "SparkConfig",
     "RapidsConfig",
     "PandasConfig",
+    "PolarsConfig",
     # Exceptions
     "DataForgeError",
     "EngineNotAvailableError",
@@ -132,6 +139,7 @@ __all__ = [
     "EngineRecommendation",
     # Engine factories
     "get_pandas_engine",
+    "get_polars_engine",
     "get_spark_engine",
     "get_rapids_engine",
     # Quality
