@@ -271,7 +271,7 @@ class EngineRecommender:
                 reason=f"Data size ({data_size_mb:.1f}MB) is small - Pandas is most efficient",
                 confidence=1.0,
                 performance_notes="Pandas has minimal overhead for small datasets",
-                alternatives=[EngineType.SPARK] if cluster_available else None
+                alternatives=[EngineType.POLARS] if data_size_mb > 50 else None
             )
 
         # Small data (100MB - 1GB)
@@ -282,15 +282,15 @@ class EngineRecommender:
                     reason=f"GPU available - RAPIDS provides 5-20x speedup for {data_size_mb:.1f}MB data",
                     confidence=0.9,
                     performance_notes="Expected 5-20x performance improvement over Pandas",
-                    alternatives=[EngineType.PANDAS]
+                    alternatives=[EngineType.POLARS]
                 )
             else:
                 return EngineRecommendation(
-                    engine=EngineType.PANDAS,
-                    reason=f"Data size ({data_size_mb:.1f}MB) fits comfortably in memory",
+                    engine=EngineType.POLARS,
+                    reason=f"Data size ({data_size_mb:.1f}MB) benefits from Polars' Rust-backed performance",
                     confidence=0.85,
-                    performance_notes="Good performance for data under 1GB",
-                    alternatives=[EngineType.SPARK] if cluster_available else None
+                    performance_notes="Polars provides 5-20x speedup over Pandas with lazy evaluation",
+                    alternatives=[EngineType.PANDAS, EngineType.SPARK] if cluster_available else [EngineType.PANDAS]
                 )
 
         # Medium data (1GB - 10GB)
@@ -305,7 +305,7 @@ class EngineRecommender:
                         reason=f"GPU ({gpu_memory_gb:.1f}GB) can handle {data_size_mb:.1f}MB data efficiently",
                         confidence=0.9,
                         performance_notes="Expected 10-50x speedup for aggregations and joins",
-                        alternatives=[EngineType.SPARK]
+                        alternatives=[EngineType.POLARS, EngineType.SPARK]
                     )
                 else:
                     warnings.append(
@@ -320,17 +320,17 @@ class EngineRecommender:
                     reason=f"Data size ({data_size_mb:.1f}MB) benefits from distributed processing",
                     confidence=0.85,
                     performance_notes="Spark provides fault tolerance and scalability",
-                    alternatives=alternatives or None,
+                    alternatives=[EngineType.POLARS] + (alternatives or []),
                     warnings=warnings or None
                 )
             else:
                 return EngineRecommendation(
-                    engine=EngineType.SPARK,
-                    reason=f"Data size ({data_size_mb:.1f}MB) exceeds Pandas recommended limit",
-                    confidence=0.75,
-                    performance_notes="Using Spark local mode - consider cluster for better performance",
-                    alternatives=alternatives or None,
-                    warnings=["Running in local mode - may be slow for complex operations"]
+                    engine=EngineType.POLARS,
+                    reason=f"Data size ({data_size_mb:.1f}MB) - Polars handles efficiently on single node",
+                    confidence=0.80,
+                    performance_notes="Polars streaming mode supports out-of-core processing",
+                    alternatives=[EngineType.SPARK] + (alternatives or []),
+                    warnings=warnings or None
                 )
 
         # Large data (> 10GB)
@@ -396,6 +396,16 @@ class EngineRecommender:
         if engine == EngineType.PANDAS:
             estimates["relative_speed"] = 1.0
             estimates["memory_overhead"] = "3-5x data size"
+            estimates["startup_time"] = "minimal"
+
+        elif engine == EngineType.POLARS:
+            if operation in ["aggregation", "groupby"]:
+                estimates["relative_speed"] = 15.0
+            elif operation in ["join"]:
+                estimates["relative_speed"] = 10.0
+            else:
+                estimates["relative_speed"] = 5.0
+            estimates["memory_overhead"] = "2-3x data size (more efficient than Pandas)"
             estimates["startup_time"] = "minimal"
 
         elif engine == EngineType.SPARK:

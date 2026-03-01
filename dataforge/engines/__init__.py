@@ -6,6 +6,7 @@ for different processing backends.
 
 Available Engines:
     - PandasEngine: Single-node processing with pandas
+    - PolarsEngine: High-performance single-node processing with Polars
     - SparkEngine: Distributed processing with PySpark
     - RapidsEngine: GPU-accelerated processing with RAPIDS/cuDF
 
@@ -17,35 +18,42 @@ Engine Selection Guide:
     | Data Size     | No GPU/Cluster | With GPU         | With Cluster      |
     +---------------+----------------+------------------+-------------------+
     | < 100 MB      | Pandas         | Pandas           | Pandas            |
-    | 100 MB - 1 GB | Pandas         | RAPIDS           | Pandas/Spark      |
-    | 1 GB - 10 GB  | Spark (local)  | RAPIDS           | Spark             |
+    | 100 MB - 1 GB | Polars/Pandas  | RAPIDS           | Polars/Spark      |
+    | 1 GB - 10 GB  | Polars/Spark   | RAPIDS           | Spark             |
     | > 10 GB       | Spark          | Spark + RAPIDS   | Spark             |
     +---------------+----------------+------------------+-------------------+
 
 Example:
-    >>> from dataforge.engines import PandasEngine, SparkEngine
+    >>> from dataforge.engines import PandasEngine, PolarsEngine, SparkEngine
     >>>
     >>> # Use Pandas for small datasets
     >>> pandas_engine = PandasEngine()
     >>> df = pandas_engine.read_csv("small_data.csv")
+    >>>
+    >>> # Use Polars for medium datasets
+    >>> polars_engine = PolarsEngine()
+    >>> df = polars_engine.read_parquet("medium_data.parquet")
     >>>
     >>> # Use Spark for large datasets
     >>> spark_engine = SparkEngine()
     >>> df = spark_engine.read_parquet("large_data/")
 
 Best Practices:
-    - Use Pandas for data < 1GB and complex transformations
-    - Use Spark for distributed processing and data > 1GB
+    - Use Pandas for data < 100MB and complex pandas ecosystem needs
+    - Use Polars for data 100MB-10GB with high single-node performance
+    - Use Spark for distributed processing and data > 10GB
     - Use RAPIDS when GPU is available and data fits in GPU memory
     - Use the EngineRecommender for automatic selection
 """
 
 from dataforge.engines.pandas_engine import PandasEngine
+from dataforge.engines.polars_engine import PolarsEngine
 from dataforge.engines.spark_engine import SparkEngine
 from dataforge.engines.rapids_engine import RapidsEngine
 
 __all__ = [
     "PandasEngine",
+    "PolarsEngine",
     "SparkEngine",
     "RapidsEngine",
 ]
@@ -61,10 +69,11 @@ def get_available_engines() -> dict:
     Example:
         >>> engines = get_available_engines()
         >>> print(engines)
-        {'pandas': True, 'spark': True, 'rapids': False}
+        {'pandas': True, 'polars': True, 'spark': False, 'rapids': False}
     """
     return {
         "pandas": PandasEngine.check_availability(),
+        "polars": PolarsEngine.check_availability(),
         "spark": SparkEngine.check_availability(),
         "rapids": RapidsEngine.check_availability(),
     }

@@ -21,8 +21,16 @@ This document describes the testing infrastructure, tools, and procedures for th
 |------|---------|--------------|
 | **pytest** | Unit and integration testing | `pip install pytest` |
 | **ty** | Type checking (astral-sh/ty) | `uv tool install ty` or `pip install ty` |
+| **ruff** | Fast linting and formatting | `pip install ruff` |
+| **pre-commit** | Git hook manager | `pip install pre-commit` |
 | **moto** | AWS mock for S3 testing | `pip install moto[s3]` |
 | **boto3** | AWS SDK for S3 tests | `pip install boto3` |
+
+### Shell Tools
+
+| Tool | Purpose | Installation |
+|------|---------|--------------|
+| **shellcheck** | Shell script static analysis | `brew install shellcheck` or `apt install shellcheck` |
 
 ### Scala Tools
 
@@ -74,15 +82,19 @@ ty check dataforge/ --python-version 3.10
 #### Current ty Results
 
 ```
-Total errors: 133
-- Import errors (expected): 104 (optional dependencies not installed)
-- Code errors: 29
+Total diagnostics: 156
+- Import errors (expected): 88 (optional dependencies not installed)
+- Code errors: 67 (pre-existing patterns in engine implementations)
+- Warnings: 1
 ```
 
 Most code errors are due to:
 - Type inference with heterogeneous dictionaries
-- Optional dependency type stubs not available
+- Optional dependency type stubs not available (pyspark, cudf, etc.)
 - Strict method override checking in streaming sinks
+- Union type narrowing for conditional imports
+
+The new Polars engine (`polars_engine.py`) passes ty with zero errors.
 
 #### ty Configuration
 
@@ -331,17 +343,21 @@ jobs:
 
 | Test File | Tests | Passed | Failed |
 |-----------|-------|--------|--------|
-| test_core.py | 19 | 19 | 0 |
+| test_core.py | 26 | 26 | 0 |
+| test_imports.py | 36 | 36 | 0 |
 | test_s3_integration.py | 18 | 18 | 0 |
-| **Total** | **37** | **37** | **0** |
+| **Total** | **80** | **80** | **0** |
 
 ### Python Type Checking (ty)
 
 | Category | Count |
 |----------|-------|
-| Unresolved imports | 104 (expected - optional deps) |
-| Code errors | 29 |
-| **Total errors** | **133** |
+| Unresolved imports | 88 (expected - optional deps not installed) |
+| Code errors | 67 (pre-existing, mostly optional dep patterns) |
+| Warnings | 1 |
+| **Total diagnostics** | **156** |
+
+Note: The Polars engine (`dataforge/engines/polars_engine.py`) has **zero** ty errors.
 
 ### Scala Static Analysis (scalint)
 
